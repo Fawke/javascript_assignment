@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Stacked bar chart for Asian countries</title>
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/d3-legend/1.1.0/d3-legend.js"></script>
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+    <style>
+    .axis path,
+    .axis line {
+    fill: black;
+    stroke: #000;
+    shape-rendering: crispEdges;
+  }
+  </style>
+  </head>
+  <body>
+    <script>
+      var outerWidth = 1300;
+      var outerHeight = 500;
+      var margin = {  top : 100, right : 0, bottom : 80, left : 100};
+      var barPadding = 0.4;
+      var colorColumn = "indicator";
+      var layerColumn = colorColumn;
+      var yColumn = "average";
+      var xColumn = "year";
+      var layerColumn = colorColumn;
+      var innerWidth  = outerWidth  - margin.left - margin.right;
+      var innerHeight = outerHeight - margin.top  - margin.bottom;
+
+      var xScale = d3.scale.ordinal().rangeBands([0, innerWidth], .3,.4);
+      var yScale = d3.scale.linear().range([innerHeight, 0]);
+      var colorScale = d3.scale.category10();
+      var xAxis = d3.svg.axis().scale(xScale).orient("bottom")
+        .outerTickSize(0);
+      var yAxis = d3.svg.axis().scale(yScale).orient("left")
+        .outerTickSize(0);
+        <!-- Legend data box size-->
+        var colorLegend = d3.legend.color()
+        .scale(colorScale)
+        .shapePadding(3)
+        .shapeWidth(25)
+        .shapeHeight(25)
+        .labelOffset(4);
+        var svg = d3.select("body").append("svg")
+          .attr("width",  outerWidth)
+          .attr("height", outerHeight);
+
+      function render(data){
+        <!--Grouping of data based on IndicatorCode, Year and finding average-->
+        var grouped = d3.nest()
+                    .key(function(d) { return d.IndicatorCode;})
+                    .key(function(d) { return d.Year;})
+                    .rollup(function(leaves) {
+                      var sum = 0;
+                      leaves.forEach(function(s) {
+                        sum += parseFloat(s.Value);
+                      });
+                      return (sum/leaves.length);
+                    })
+                    .entries(data);
+
+            var indicatorName = "";
+           for(var value in grouped) {
+             indicatorName = grouped[value].key;
+             grouped[value].values = grouped[value].values.map(function(d) {
+               return {
+                 year : d.key,
+                 average : d.values,
+                 indicator : indicatorName
+               }
+             });
+           }
+
+        var stack = d3.layout.stack()
+          .y(function (d){ return d[yColumn]; })
+          .values(function (d){ return d.values; });
+        var layers = stack(grouped);
+        <!-- Defining x and y axis domain-->
+        xScale.domain(layers[0].values.map(function (d){
+          return d[xColumn];
+        }));
+        yScale.domain([
+        40,80
+        ]);
+        colorScale.domain(layers.map(function (layer){
+          return layer.key;
+        }));
+        var g = svg.append("g")
+          .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+          <!-- x axis values and label-->
+        var xAxisG = g.append("g")
+          .attr("class", "x axis")
+          .attr("transform", "translate(0," + innerHeight + ")")
+          .call(xAxis)
+          .attr("width", outerWidth)
+          .selectAll('text')
+          .attr("transform","rotate(-60)")
+          .attr("dx","-.3em")
+          .attr("dy",".25em")
+          .style("text-anchor","end")
+          .style("font-size","15px")
+          .style("font-weight","bold")
+          .style("font-family","monospace");
+
+          <!-- y axis values and label-->
+        var yAxisG = g.append("g")
+          .attr("class", "y axis")
+          .call(yAxis)
+          .selectAll('text')
+          .attr("transform",0)
+          .attr("dx","-.3em")
+          .attr("dy",".25em")
+          .style("text-anchor","end")
+          .style("font-size","15px")
+          .style("font-weight","bold")
+          .style("font-family","monospace");
+
+        xAxisG.call(xAxis);
+        yAxisG.call(yAxis);
+        <!-- appending bars and added transistion-->
+        var layerGroups = g.selectAll(".layer").data(layers);
+        layerGroups.enter().append("g").attr("class", "layer");
+
+        layerGroups.transition()        // <-- This is new,
+        .duration(3000).style("fill", function (d){
+          return colorScale(d.key);
+
+        });
+        var bars = layerGroups.selectAll("rect").data(function (d){
+          return d.values;
+        });
+        bars.enter().append("rect")
+        .attr("x", function (d){ return xScale(d[xColumn]); })
+          .attr("y", function (d){ return yScale(d.y); })
+          .attr("width", xScale.rangeBand())
+          .transition()
+          .delay(function(d, i){
+            return i * 50;
+          })
+          .attr("height", function (d){ return innerHeight - yScale(d.y ); })
+          var colorLegendG = g.append("g")
+        .attr("class", "color-legend")
+        .attr("transform", "translate(1150, -50)");
+           colorLegendG.call(colorLegend);
+      }
+      d3.json("json/male_female.json", render);
+    </script>
+  </body>
+</html>
